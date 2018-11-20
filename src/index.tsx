@@ -16,13 +16,20 @@ const result4 = execute(
   )
 )('test3');
 
+// This is whre things get interesting...
 const result5 = execute(
   pipe(
+    // first map is sync
     map<string, string>(v => v + '!'),
+    // second is async, because of this, the result will be async
     map<string, Promise<string>>(v => Promise.resolve(v + '!')),
+    // but map know how to handle Promise so here we get the string that resolve from the step before
     map<string, string>(v => v + '!')
   )
 )('test3');
+// because there is a Promise at some point in the chain
+// the result is async and a Promise is returned
+result5.then();
 
 console.log({
   result1,
