@@ -1,6 +1,37 @@
 import { Operator, toPromise, map, filter, toFunc, flattenPromiseValue, pipe, execute, mapAsync } from './op-op';
 import { string } from 'prop-types';
 
+// synchronous operator (Operator<string, string, false>), it return the value
+const result1 = execute(map<string, string>(v => v + '!'))('test');
+// synchronous operatir but it return a promise (Operator<string, Promise<string>, false>)
+const result2 = execute(mapAsync<string, Promise<string>>(v => Promise.resolve(v + '!')))('test');
+// asynchronous operator (Operator<string, string, true>) because map handle promise
+// but because there is a promise somewhere, it's async and return a Promise
+const result3 = execute(map<string, Promise<string>>(v => Promise.resolve(v + '!')))('test');
+
+const result4 = execute(
+  pipe(
+    map<string, string>(v => v + '!'),
+    map<string, string>(v => v + '!')
+  )
+)('test3');
+
+const result5 = execute(
+  pipe(
+    map<string, string>(v => v + '!'),
+    map<string, Promise<string>>(v => Promise.resolve(v + '!')),
+    map<string, string>(v => v + '!')
+  )
+)('test3');
+
+console.log({
+  result1,
+  result2,
+  result3,
+  result4,
+  result5,
+});
+
 // function wait(time: number): Promise<void> {
 //   return new Promise(resolve => {
 //     window.setTimeout(() => {
@@ -99,31 +130,3 @@ import { string } from 'prop-types';
 //   })
 // );
 // console.log('after');
-
-const result1 = execute(map<string, string>(v => v + '!'))('test');
-const result2 = execute(map<string, Promise<string>>(v => Promise.resolve(v + '!')))('test');
-
-const result3 = execute(mapAsync<string, Promise<string>>(v => Promise.resolve(v + '!')))('test');
-
-const result4 = execute(
-  pipe(
-    map<string, string>(v => v + '!'),
-    map<string, string>(v => v + '!')
-  )
-)('test3');
-
-const result5 = execute(
-  pipe(
-    map<string, string>(v => v + '!'),
-    map<string, Promise<string>>(v => Promise.resolve(v + '!')),
-    map<string, string>(v => v + '!')
-  )
-)('test3');
-
-console.log({
-  result1,
-  result2,
-  result3,
-  result4,
-  result5,
-});
