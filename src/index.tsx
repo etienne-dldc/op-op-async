@@ -100,22 +100,23 @@ import { string } from 'prop-types';
 // );
 // console.log('after');
 
-const result1 = execute(map<string, string>(v => v + 'hey'))('test');
+const result1 = execute(map<string, string>(v => v + '!'))('test');
+const result2 = execute(map<string, Promise<string>>(v => Promise.resolve(v + '!')))('test');
 
-const result2 = execute(mapAsync<string, Promise<string>>(v => Promise.resolve(v + 'hey')))('test');
-
-const result3 = execute(
-  pipe(
-    map<string, string>(v => v + 'hey'),
-    map<string, string>(v => v + 'hey')
-  )
-)('test3');
+const result3 = execute(mapAsync<string, Promise<string>>(v => Promise.resolve(v + '!')))('test');
 
 const result4 = execute(
   pipe(
-    map<string, string>(v => v + 'hey'),
-    map<string, Promise<string>>(v => Promise.resolve(v + 'hey')),
-    map<string, string>(v => v + 'hey')
+    map<string, string>(v => v + '!'),
+    map<string, string>(v => v + '!')
+  )
+)('test3');
+
+const result5 = execute(
+  pipe(
+    map<string, string>(v => v + '!'),
+    map<string, Promise<string>>(v => Promise.resolve(v + '!')),
+    map<string, string>(v => v + '!')
   )
 )('test3');
 
@@ -124,4 +125,5 @@ console.log({
   result2,
   result3,
   result4,
+  result5,
 });
