@@ -1,10 +1,9 @@
-import { Operator, toPromise, map, filter, toFunc, flattenPromiseValue, pipe, execute, mapAsync } from './op-op';
-import { string } from 'prop-types';
+import { map, pipe, execute, mapSync } from './op-op';
 
 // synchronous operator (Operator<string, string, false>), it return the value
 const result1 = execute(map<string, string>(v => v + '!'))('test');
 // synchronous operatir but it return a promise (Operator<string, Promise<string>, false>)
-const result2 = execute(mapAsync<string, Promise<string>>(v => Promise.resolve(v + '!')))('test');
+const result2 = execute(mapSync<string, Promise<string>>(v => Promise.resolve(v + '!')))('test');
 // asynchronous operator (Operator<string, string, true>) because map handle promise
 // but because there is a promise somewhere, it's async and return a Promise
 const result3 = execute(map<string, Promise<string>>(v => Promise.resolve(v + '!')))('test');

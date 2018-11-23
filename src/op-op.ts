@@ -15,11 +15,16 @@ function isPromise(maybe: any): maybe is Promise<any> {
   return Promise.resolve(maybe) === maybe;
 }
 
-type Flatten<Val> = Val extends Promise<infer U> ? U : Val;
+type Unwrap<Val> = Val extends Promise<infer U> ? U : Val;
 
 /**
 var range = num => Array(num).fill(null).map((v, i) => i);
-range(2).map(i => `// prettier-ignore\nexport function pipe<Input, ${range(i + 1).map(v => v+1).map(j => `O${j}, A${j} extends boolean`).join(', ')}>(${range(i + 1).map(v => v+1).map(j => `operator${j}: Operator<${j === 1 ? 'Input' : `O${j - 1}`}, O${j}, A${j}>`).join(', ')}): Operator<Input, O${i + 1}, CombineAsync<[${range(i + 1).map(v => v+1).map(j => `A${j}`).join(', ')}]>>;`).join('\n');
+range(10).map(i => [
+  `// prettier-ignore\n`,
+  `export function pipe<Input, ${range(i + 1).map(v => v+1).map(j => `O${j}, A${j} extends boolean`).join(', ')}>`,
+  `(${range(i + 1).map(v => v+1).map(j => `operator${j}: Operator<${j === 1 ? 'Input' : `O${j - 1}`}, O${j}, A${j}>`).join(', ')}): `,
+  `Operator<Input, O${i + 1}, CombineAsync<[${range(i + 1).map(v => v+1).map(j => `A${j}`).join(', ')}]>>;`
+].join('')).join('\n');
  **/
 
 // prettier-ignore
@@ -66,10 +71,10 @@ export function pipe<Input>(
   };
 }
 
-export function flattenPromiseValue<Input, Output>(
+export function toAsync<Input, Output>(
   operator: Operator<Input, Output>
 ): Output extends Promise<infer U> ? Operator<Input, U, true> : Operator<Input, Output, false> {
-  const handle = (pass: Pass<Flatten<Output>>): Pass<Output> => (hErr, hVal) => {
+  const handle = (pass: Pass<Unwrap<Output>>): Pass<Output> => (hErr, hVal) => {
     if (isPromise(hVal)) {
       hVal
         .then(val => {
@@ -86,26 +91,12 @@ export function flattenPromiseValue<Input, Output>(
       pass(hErr, hVal as any);
     }
   };
-  return ((err: OpError, value: Input, next: Pass<Flatten<Output>>, complete = next) => {
+  return ((err: OpError, value: Input, next: Pass<Unwrap<Output>>, complete = next) => {
     operator(err, value, handle(next), handle(complete));
   }) as any;
 }
 
-export const toFunc = <Input, Output>(operator: Operator<Input, Output>) => {
-  return (value: Input) => operator(null, value, () => {});
-};
-
-export const toPromise = <Input, Output>(operator: Operator<Input, Output>) => {
-  return (value: Input) =>
-    new Promise((resolve, reject) =>
-      operator(null, value, (err, value) => {
-        if (err) reject(err);
-        else resolve(value);
-      })
-    );
-};
-
-export function mapAsync<Input, Output>(operation: (value: Input) => Output): Operator<Input, Output> {
+export function mapSync<Input, Output>(operation: (value: Input) => Output): Operator<Input, Output> {
   return (err, value, next) => {
     if (err) {
       next(err);
@@ -121,15 +112,19 @@ export function mapAsync<Input, Output>(operation: (value: Input) => Output): Op
 }
 
 export function map<Input, Output>(operation: (value: Input) => Output) {
-  return flattenPromiseValue(mapAsync(operation));
+  return toAsync(mapSync(operation));
 }
 
-export function filter<Input>(operation: (value: Input) => boolean): Operator<Input, Input> {
+export function filterSync<Input>(operation: (value: Input) => boolean): Operator<Input, Input> {
   return (err, value, next, complete = next) => {
     if (err) next(err);
     else if (operation(value)) next(null, value);
     else complete(null, value);
   };
+}
+
+export function filter<Input>(operation: (value: Input) => boolean): Operator<Input, Input> {
+  return toAsync<Input, Input>(filterSync(operation));
 }
 
 export function execute<Input, Output, Async extends boolean>(action: Operator<Input, Output, Async>) {
