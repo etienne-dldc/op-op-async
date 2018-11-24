@@ -1,4 +1,4 @@
-import { Operator, Pass } from './op-op';
+import { Operator, Pass } from './lib';
 
 type Context<Value> = {
   value: Value;

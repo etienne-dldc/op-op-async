@@ -1,4 +1,4 @@
-import { map, pipe, execute, mapSync } from './op-op';
+import { map, pipe, execute, mapSync } from './lib';
 
 // synchronous operator (Operator<string, string, false>), it return the value
 const result1 = execute(map<string, string>(v => v + '!'))('test');

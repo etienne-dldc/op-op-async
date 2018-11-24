@@ -71,7 +71,7 @@ export function pipe<Input>(
   };
 }
 
-export function toAsync<Input, Output>(
+export function toAsyncValue<Input, Output>(
   operator: Operator<Input, Output>
 ): Output extends Promise<infer U> ? Operator<Input, U, true> : Operator<Input, Output, false> {
   const handle = (pass: Pass<Unwrap<Output>>): Pass<Output> => (hErr, hVal) => {
@@ -112,7 +112,7 @@ export function mapSync<Input, Output>(operation: (value: Input) => Output): Ope
 }
 
 export function map<Input, Output>(operation: (value: Input) => Output) {
-  return toAsync(mapSync(operation));
+  return toAsyncValue(mapSync(operation));
 }
 
 export function filterSync<Input>(operation: (value: Input) => boolean): Operator<Input, Input> {
@@ -123,9 +123,9 @@ export function filterSync<Input>(operation: (value: Input) => boolean): Operato
   };
 }
 
-export function filter<Input>(operation: (value: Input) => boolean): Operator<Input, Input> {
-  return toAsync<Input, Input>(filterSync(operation));
-}
+// export function filter<Input>(operation: (value: Input) => boolean): Operator<Input, Input> {
+//   return toAsync<Input, Input>(filterSync(operation));
+// }
 
 export function execute<Input, Output, Async extends boolean>(action: Operator<Input, Output, Async>) {
   return (value: Input): Async extends true ? (Output extends Promise<infer U> ? Output : Promise<Output>) : Output => {
