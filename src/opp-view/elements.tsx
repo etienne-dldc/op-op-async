@@ -11,7 +11,7 @@ export const AppWrapper = styled('div')({
   overflow: 'hidden',
 });
 
-export const TreeWrapper = styled('div')({
+export const ColumnsWrapper = styled('div')({
   flex: 1,
   display: 'flex',
   flexDirection: 'row',
@@ -21,23 +21,43 @@ export const TreeWrapper = styled('div')({
 });
 
 export const ColumnWrapper = styled('div')({
-  width: 300,
-  borderRight: '2px solid blue',
+  width: 500,
+  borderRight: '2px solid #263238',
   display: 'flex',
   flexDirection: 'column',
+  background: '#EEEEEE',
   alignItems: 'stretch',
   flexShrink: 0,
   overflowY: 'auto',
 });
 
-export const StepWrapper = styled('div')({
+export const MinorTreeWrapper = styled('div')({
   flexShrink: 0,
 });
 
-export const StepNameWrapper = styled('div')({
+type NodeWrapperProps = { selected: boolean; selectedExact: boolean; parentSelected: boolean };
+
+export const NodeWrapper = styled('div')<NodeWrapperProps>(
+  {
+    display: 'flex',
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    cursor: 'pointer',
+  },
+  (props: NodeWrapperProps) => ({
+    background: props.selectedExact
+      ? '#2196F3'
+      : props.parentSelected
+      ? '#BBDEFB'
+      : props.selected
+      ? '#1565C0'
+      : 'white',
+    color: props.selected || props.selectedExact ? 'white' : '#263238',
+  })
+);
+
+export const NodeContent = styled('div')({
   padding: 10,
 });
 
-export const MinorWrapper = styled('div')({
-  marginLeft: 20,
-});
+export const MinorWrapper = styled('div')({});

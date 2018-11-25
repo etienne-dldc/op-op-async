@@ -8,7 +8,7 @@ import { TreeApp } from './opp-view';
 
 injectGlobal`
 html, body {
-  font-family: sans-serif;
+  font-family: 'Fira Code';
 }
 `;
 
