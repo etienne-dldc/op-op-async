@@ -5,7 +5,9 @@ const execution = createExecution<{ error: any }, null>({
   getOnErrorParams: error => ({ error }),
   onError: ({ error }) => {
     console.log(error);
-    return null;
+    return {
+      leYolo: [asExecutable('oops')],
+    };
   },
   onFrameEnd: () => {
     console.log('frame end');
@@ -15,7 +17,12 @@ const execution = createExecution<{ error: any }, null>({
     promise: () => null,
     object: () => null,
     array: () => null,
-    noMatch: () => null,
+    unknown: () => null,
+  },
+  basicHandlerHooks: {
+    unknown: (exec, next, path, onError, isInError, ctx) => {
+      return ctx.reject(onError, new Error('Unsupported'), path, isInError);
+    },
   },
 });
 

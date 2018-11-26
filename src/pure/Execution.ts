@@ -25,21 +25,24 @@ type ObjectOfExecutable = {
  * Execution Handlers
  */
 
-type BasicHandlerContext<OnErroParams, ExecutionHandlerOutput> = {
-  resolve(exec: any, path: Path, onError: ErrorFunction<OnErroParams>): ExecutionHandlerOutput;
-  resolveAsync(exec: any, path: Path, onError: ErrorFunction<OnErroParams>): void;
-  reject(onError: ErrorFunction<OnErroParams>, error: any, path: Path): ExecutionHandlerOutput;
-  rejectAsync(onError: ErrorFunction<OnErroParams>, error: any, path: Path): void;
+type BasicHandlerContext<OnErroParams, Output> = {
+  resolve(exec: any, path: Path, onError: ErrorFunction<OnErroParams>, isInError: boolean): Output;
+  resolveAsync(exec: any, path: Path, onError: ErrorFunction<OnErroParams>, isInError: boolean): void;
+  reject(onError: ErrorFunction<OnErroParams>, error: any, path: Path, isInError: boolean): Output;
+  rejectAsync(onError: ErrorFunction<OnErroParams>, error: any, path: Path, isInError: boolean): void;
 };
 type ExecutionMatcher<Exec> = (exec: any) => exec is Exec;
-type ExecutionHandler<OnErroParams, ExecutionHandlerOutput, Exec> = (
+type ExecutionHandler<OnErroParams, Output, Exec> = (
   exec: Exec,
-  ctx: BasicHandlerContext<OnErroParams, ExecutionHandlerOutput>
-) => ExecutionHandlerOutput;
+  path: Path,
+  onError: ErrorFunction<OnErroParams>,
+  isInError: boolean,
+  ctx: BasicHandlerContext<OnErroParams, Output>
+) => Output;
 
-type Registered<OnErroParams, ExecutionHandlerOutput, Exec> = {
+type Registered<OnErroParams, Output, Exec> = {
   matcher: ExecutionMatcher<Exec>;
-  handler: ExecutionHandler<OnErroParams, ExecutionHandlerOutput, Exec>;
+  handler: ExecutionHandler<OnErroParams, Output, Exec>;
 };
 
 /**
@@ -59,7 +62,7 @@ type BasicHandlerOutputs<
   promise: (promise: Promise<any>, context: HandlerContext) => HandlerOutput;
   array: (outputs: Array<HandlerOutput>, context: HandlerContext) => HandlerOutput;
   object: (outputs: { [key: string]: HandlerOutput }, context: HandlerContext) => HandlerOutput;
-  noMatch: (exec: any, context: HandlerContext) => HandlerOutput;
+  unknown: (exec: any, context: HandlerContext) => HandlerOutput;
 };
 
 type BasicHandlerHooks<
@@ -67,29 +70,43 @@ type BasicHandlerHooks<
   HandlerOutput,
   HandlerContext extends BasicHandlerContext<OnErroParams, HandlerOutput>
 > = {
-  null?: (next: () => HandlerOutput, path: Path, context: HandlerContext) => HandlerOutput;
+  null?: (
+    next: () => HandlerOutput,
+    path: Path,
+    onError: ErrorFunction<OnErroParams>,
+    isInError: boolean,
+    context: HandlerContext
+  ) => HandlerOutput;
   promise?: (
     promise: Promise<any>,
     next: (transformed: Promise<any>) => HandlerOutput,
     path: Path,
+    onError: ErrorFunction<OnErroParams>,
+    isInError: boolean,
     context: HandlerContext
   ) => HandlerOutput;
   array?: (
     outputs: Array<any>,
     next: (transformed: Array<any>) => HandlerOutput,
     path: Path,
+    onError: ErrorFunction<OnErroParams>,
+    isInError: boolean,
     context: HandlerContext
   ) => HandlerOutput;
   object?: (
     outputs: { [key: string]: any },
     next: (transformed: { [key: string]: any }) => HandlerOutput,
     path: Path,
+    onError: ErrorFunction<OnErroParams>,
+    isInError: boolean,
     context: HandlerContext
   ) => HandlerOutput;
-  noMatch?: (
+  unknown?: (
     exec: any,
     next: (transformed: any) => HandlerOutput,
     path: Path,
+    onError: ErrorFunction<OnErroParams>,
+    isInError: boolean,
     context: HandlerContext
   ) => HandlerOutput;
 };
@@ -134,61 +151,39 @@ export function createExecution<
     reject,
     rejectAsync,
   });
-  let onRunEnd: (() => void) | null = null;
 
-  function resolveAsync(exec: any, path: Path, onError: ErrorFunction<OnErroParams>): void {
-    const output = resolve(exec, path, onError);
+  function resolveAsync(exec: any, path: Path, onError: ErrorFunction<OnErroParams>, isInError: boolean): void {
+    const output = resolve(exec, path, onError, isInError);
     onFrameEnd(output);
   }
 
-  function rejectAsync(onError: ErrorFunction<OnErroParams>, error: any, path: Path): void {
+  function rejectAsync(onError: ErrorFunction<OnErroParams>, error: any, path: Path, isInError: boolean): void {
+    // if onError throw an error
+    if (isInError && onError === defaultOnError) {
+      throw error;
+    }
     const errorResult = onError(getOnErrorParams(error));
     const erroName = (onError as any).displayName || onError.name || 'onError';
-    resolveAsync(errorResult, [...path, erroName], defaultOnError);
+    resolveAsync(errorResult, [...path, erroName], defaultOnError, true);
   }
 
-  function reject(onError: ErrorFunction<OnErroParams>, error: any, path: Path): HandlerOutput {
+  function reject(onError: ErrorFunction<OnErroParams>, error: any, path: Path, isInError: boolean): HandlerOutput {
+    // if onError throw an error
+    if (isInError && onError === defaultOnError) {
+      throw error;
+    }
     const errorResult = onError(getOnErrorParams(error));
     const erroName = (onError as any).displayName || onError.name || 'onError';
-    return resolve(errorResult, [...path, erroName], defaultOnError);
+    return resolve(errorResult, [...path, erroName], defaultOnError, true);
   }
 
-  function resolve(exec: any, path: Path, onError: ErrorFunction<OnErroParams>): HandlerOutput {
+  function resolve(exec: any, path: Path, onError: ErrorFunction<OnErroParams>, isInError: boolean): HandlerOutput {
     console.log(path);
-
-    if (exec === null) {
-      console.log('null');
-      const next = () => basicHandlerOutputs.null(handlerContext);
-      return basicHandlerHooks.null ? basicHandlerHooks.null(next, path, handlerContext) : next();
-    }
-    if (isPromise(exec)) {
-      console.log('promise');
-      const next = (transformed: Promise<any>) =>
-        basicHandlerOutputs.promise(
-          transformed
-            .then(subResult => resolveAsync(subResult, [...path, 'resolved'], onError))
-            .catch(error => {
-              rejectAsync(onError, error, [...path, 'rejected']);
-            }),
-          handlerContext
-        );
-      return basicHandlerHooks.promise ? basicHandlerHooks.promise(exec, next, path, handlerContext) : next(exec);
-    }
-    if (Array.isArray(exec)) {
-      const next = (transformed: Array<any>) =>
-        basicHandlerOutputs.array(
-          transformed.map((item, index) => {
-            return resolve(item, appToPath(path, index), onError);
-          }),
-          handlerContext
-        );
-      return basicHandlerHooks.array ? basicHandlerHooks.array(exec, next, path, handlerContext) : next(exec);
-    }
 
     let customExecResult: HandlerOutput = null as any;
     const customExecUsed = registered.some(reg => {
       if (reg.matcher(exec)) {
-        customExecResult = reg.handler(exec, handlerContext);
+        customExecResult = reg.handler(exec, path, onError, isInError, handlerContext);
         return true;
       }
       return false;
@@ -197,30 +192,74 @@ export function createExecution<
       return customExecResult;
     }
 
+    // Null
+    if (exec === null) {
+      console.log('null');
+      const next = () => basicHandlerOutputs.null(handlerContext);
+      return basicHandlerHooks.null ? basicHandlerHooks.null(next, path, onError, isInError, handlerContext) : next();
+    }
+
+    // Promise
+    if (isPromise(exec)) {
+      console.log('promise');
+      const next = (transformed: Promise<any>) =>
+        basicHandlerOutputs.promise(
+          transformed
+            .then(subResult => resolveAsync(subResult, [...path, 'resolved'], onError, isInError))
+            .catch(error => {
+              rejectAsync(onError, error, [...path, 'rejected'], isInError);
+            }),
+          handlerContext
+        );
+      return basicHandlerHooks.promise
+        ? basicHandlerHooks.promise(exec, next, path, onError, isInError, handlerContext)
+        : next(exec);
+    }
+
+    // Array
+    if (Array.isArray(exec)) {
+      const next = (transformed: Array<any>) =>
+        basicHandlerOutputs.array(
+          transformed.map((item, index) => {
+            return resolve(item, appToPath(path, index), onError, isInError);
+          }),
+          handlerContext
+        );
+      return basicHandlerHooks.array
+        ? basicHandlerHooks.array(exec, next, path, onError, isInError, handlerContext)
+        : next(exec);
+    }
+
+    // Object
     if (isPlainObject(exec)) {
       console.log('plain object');
       const next = (transformed: { [key: string]: any }) =>
         basicHandlerOutputs.object(
           Object.keys(transformed).reduce(
             (acc, key) => {
-              acc[key] = resolve(transformed[key], appToPath(path, key), onError);
+              acc[key] = resolve(transformed[key], appToPath(path, key), onError, isInError);
               return acc;
             },
             {} as any
           ),
           handlerContext
         );
-      return basicHandlerHooks.object ? basicHandlerHooks.object(exec, next, path, handlerContext) : next(exec);
+      return basicHandlerHooks.object
+        ? basicHandlerHooks.object(exec, next, path, onError, isInError, handlerContext)
+        : next(exec);
     }
 
-    console.log('unknon');
+    // Unknown
+    console.log('unknown');
     console.log(exec);
-    const next = (transformed: any) => basicHandlerOutputs.noMatch(exec, handlerContext);
-    return basicHandlerHooks.noMatch ? basicHandlerHooks.noMatch(exec, next, path, handlerContext) : next(exec);
+    const next = (transformed: any) => basicHandlerOutputs.unknown(exec, handlerContext);
+    return basicHandlerHooks.unknown
+      ? basicHandlerHooks.unknown(exec, next, path, onError, isInError, handlerContext)
+      : next(exec);
   }
 
   function run(action: Executable): void {
-    resolveAsync(action, [], defaultOnError);
+    resolveAsync(action, [], defaultOnError, false);
   }
 
   function register<Exec>(reg: Registered<OnErroParams, HandlerOutput, Exec>): () => void {
