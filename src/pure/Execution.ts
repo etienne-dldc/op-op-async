@@ -1,199 +1,90 @@
-import { ProxyStateTree } from 'proxy-state-tree';
-import { isPlainObject, isPromise, appToPath } from './utils';
+// import { ProxyStateTree } from 'proxy-state-tree';
+// import { isPlainObject, isPromise, appToPath } from './utils';
 
-export const IS_EXECUTABLE = Symbol('IS_EXECUTABLE');
+export type ErrorFunction<Param, ExecutableType> = (params: Param) => ExecutableType;
 
-export type ExecutableAny = {
-  [IS_EXECUTABLE]: true;
+export type HandlerExits<ExecutableType, OnErroParams, Output> = {
+  resolve(exec: any, onError: ErrorFunction<OnErroParams, ExecutableType>, isInError: boolean): Output;
+  resolveAsync(exec: any, onError: ErrorFunction<OnErroParams, ExecutableType>, isInError: boolean): void;
+  reject(onError: ErrorFunction<OnErroParams, ExecutableType>, error: any, isInError: boolean): Output;
+  rejectAsync(onError: ErrorFunction<OnErroParams, ExecutableType>, error: any, isInError: boolean): void;
 };
 
-type ExecutableNoCircular = null | ExecutableAny | ObjectOfExecutable;
-
-type Path = Array<string | number>;
-
-export type Executable = ExecutableNoCircular | ArrayOfExecutable | Promise<ExecutableNoCircular>;
-
-type ArrayOfExecutable = Array<ExecutableNoCircular | Promise<ExecutableNoCircular>>;
-
-type ErrorFunction<Param> = (params: Param) => Executable;
-
-type ObjectOfExecutable = {
-  [key: string]: Executable;
-};
-
-/**
- * Execution Handlers
- */
-
-type BasicHandlerContext<OnErroParams, Output> = {
-  resolve(exec: any, path: Path, onError: ErrorFunction<OnErroParams>, isInError: boolean): Output;
-  resolveAsync(exec: any, path: Path, onError: ErrorFunction<OnErroParams>, isInError: boolean): void;
-  reject(onError: ErrorFunction<OnErroParams>, error: any, path: Path, isInError: boolean): Output;
-  rejectAsync(onError: ErrorFunction<OnErroParams>, error: any, path: Path, isInError: boolean): void;
-};
 type ExecutionMatcher<Exec> = (exec: any) => exec is Exec;
-type ExecutionHandler<
-  Exec,
-  OnErroParams,
-  HandlerOutput,
-  HandlerContext extends BasicHandlerContext<OnErroParams, HandlerOutput>
-> = (
+type ExecutionHandler<ExecutableType, Exec, OnErroParams, HandlerOutput> = (
   exec: Exec,
-  path: Path,
-  onError: ErrorFunction<OnErroParams>,
+  onError: ErrorFunction<OnErroParams, ExecutableType>,
   isInError: boolean,
-  ctx: HandlerContext
+  exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>
 ) => HandlerOutput;
 
-type Registered<
-  Exec,
-  OnErroParams,
-  HandlerOutput,
-  HandlerContext extends BasicHandlerContext<OnErroParams, HandlerOutput>
-> = {
+export type Registered<ExecutableType, Exec, OnErroParams, HandlerOutput> = {
   matcher: ExecutionMatcher<Exec>;
-  handler: ExecutionHandler<Exec, OnErroParams, HandlerOutput, HandlerContext>;
+  handler: ExecutionHandler<ExecutableType, Exec, OnErroParams, HandlerOutput>;
 };
 
 /**
  * Operator Creators
  */
 
-export function asExecutable(exec: any): ExecutableAny {
-  return exec as any;
-}
-
-type BasicHandlerOutputs<
-  OnErroParams,
-  HandlerOutput,
-  HandlerContext extends BasicHandlerContext<OnErroParams, HandlerOutput>
-> = {
-  null: (context: HandlerContext) => HandlerOutput;
-  promise: (promise: Promise<any>, context: HandlerContext) => HandlerOutput;
-  array: (outputs: Array<HandlerOutput>, context: HandlerContext) => HandlerOutput;
-  object: (outputs: { [key: string]: HandlerOutput }, context: HandlerContext) => HandlerOutput;
-  unknown: (exec: any, context: HandlerContext) => HandlerOutput;
-};
-
-type BasicHandlerHooks<
-  OnErroParams,
-  HandlerOutput,
-  HandlerContext extends BasicHandlerContext<OnErroParams, HandlerOutput>
-> = {
-  null?: (
-    next: () => HandlerOutput,
-    path: Path,
-    onError: ErrorFunction<OnErroParams>,
-    isInError: boolean,
-    context: HandlerContext
-  ) => HandlerOutput;
-  promise?: (
-    promise: Promise<any>,
-    next: (transformed: Promise<any>) => HandlerOutput,
-    path: Path,
-    onError: ErrorFunction<OnErroParams>,
-    isInError: boolean,
-    context: HandlerContext
-  ) => HandlerOutput;
-  array?: (
-    outputs: Array<any>,
-    next: (transformed: Array<any>) => HandlerOutput,
-    path: Path,
-    onError: ErrorFunction<OnErroParams>,
-    isInError: boolean,
-    context: HandlerContext
-  ) => HandlerOutput;
-  object?: (
-    outputs: { [key: string]: any },
-    next: (transformed: { [key: string]: any }) => HandlerOutput,
-    path: Path,
-    onError: ErrorFunction<OnErroParams>,
-    isInError: boolean,
-    context: HandlerContext
-  ) => HandlerOutput;
-  unknown?: (
+type ExecutionOptions<ExecutableType, OnErroParams, HandlerOutput> = {
+  onFrameEnd: (output: HandlerOutput) => void;
+  onError: ErrorFunction<OnErroParams, ExecutableType>;
+  getOnErrorParams: (error: any) => OnErroParams;
+  unknownHandlerOutput: (exec: any, exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>) => HandlerOutput;
+  unknownHandlerHook?: (
     exec: any,
     next: (transformed: any) => HandlerOutput,
-    path: Path,
-    onError: ErrorFunction<OnErroParams>,
+    onError: ErrorFunction<OnErroParams, ExecutableType>,
     isInError: boolean,
-    context: HandlerContext
+    exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>
   ) => HandlerOutput;
 };
 
-type ExecutionOptions<
-  OnErroParams,
-  HandlerOutput,
-  HandlerContext extends BasicHandlerContext<OnErroParams, HandlerOutput>
-> = {
-  onFrameEnd: (output: HandlerOutput) => void;
-  onError: ErrorFunction<OnErroParams>;
-  getOnErrorParams: (error: any) => OnErroParams;
-  createHandlerContext: (basicContext: BasicHandlerContext<OnErroParams, HandlerOutput>) => HandlerContext;
-  basicHandlerOutputs: BasicHandlerOutputs<OnErroParams, HandlerOutput, HandlerContext>;
-  basicHandlerHooks?: BasicHandlerHooks<OnErroParams, HandlerOutput, HandlerContext>;
-};
-
-export function createExecution<
-  OnErroParams,
-  HandlerOutput,
-  HandlerContext extends BasicHandlerContext<OnErroParams, HandlerOutput> = BasicHandlerContext<
-    OnErroParams,
-    HandlerOutput
-  >
->(
-  options: ExecutionOptions<OnErroParams, HandlerOutput, HandlerContext>,
-  initialRegistered: Array<Registered<any, OnErroParams, HandlerOutput, HandlerContext>> = []
+export function createExecution<ExecutableType, OnErroParams, HandlerOutput>(
+  options: ExecutionOptions<ExecutableType, OnErroParams, HandlerOutput>,
+  initialRegistered: Array<Registered<ExecutableType, any, OnErroParams, HandlerOutput>> = []
 ) {
-  const {
-    onError: defaultOnError,
-    onFrameEnd,
-    getOnErrorParams,
-    basicHandlerHooks = {},
-    createHandlerContext,
-    basicHandlerOutputs,
-  } = options;
+  const { onError: defaultOnError, onFrameEnd, getOnErrorParams, unknownHandlerHook, unknownHandlerOutput } = options;
 
-  let registered: Array<Registered<any, OnErroParams, HandlerOutput, HandlerContext>> = [...initialRegistered];
-  let handlerContext: HandlerContext = createHandlerContext({
+  let registered: Array<Registered<ExecutableType, any, OnErroParams, HandlerOutput>> = [...initialRegistered];
+  let handlerExits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput> = {
     resolve,
     resolveAsync,
     reject,
     rejectAsync,
-  });
+  };
 
-  function resolveAsync(exec: any, path: Path, onError: ErrorFunction<OnErroParams>, isInError: boolean): void {
-    const output = resolve(exec, path, onError, isInError);
+  function resolveAsync(exec: any, onError: ErrorFunction<OnErroParams, ExecutableType>, isInError: boolean): void {
+    const output = resolve(exec, onError, isInError);
     onFrameEnd(output);
   }
 
-  function rejectAsync(onError: ErrorFunction<OnErroParams>, error: any, path: Path, isInError: boolean): void {
+  function rejectAsync(onError: ErrorFunction<OnErroParams, ExecutableType>, error: any, isInError: boolean): void {
     // if onError throw an error
     if (isInError && onError === defaultOnError) {
       throw error;
     }
     const errorResult = onError(getOnErrorParams(error));
     const erroName = (onError as any).displayName || onError.name || 'onError';
-    resolveAsync(errorResult, [...path, erroName], defaultOnError, true);
+    resolveAsync(errorResult, defaultOnError, true);
   }
 
-  function reject(onError: ErrorFunction<OnErroParams>, error: any, path: Path, isInError: boolean): HandlerOutput {
+  function reject(onError: ErrorFunction<OnErroParams, ExecutableType>, error: any, isInError: boolean): HandlerOutput {
     // if onError throw an error
     if (isInError && onError === defaultOnError) {
       throw error;
     }
     const errorResult = onError(getOnErrorParams(error));
     const erroName = (onError as any).displayName || onError.name || 'onError';
-    return resolve(errorResult, [...path, erroName], defaultOnError, true);
+    return resolve(errorResult, defaultOnError, true);
   }
 
-  function resolve(exec: any, path: Path, onError: ErrorFunction<OnErroParams>, isInError: boolean): HandlerOutput {
-    console.log(path);
-
+  function resolve(exec: any, onError: ErrorFunction<OnErroParams, ExecutableType>, isInError: boolean): HandlerOutput {
     let customExecResult: HandlerOutput = null as any;
     const customExecUsed = registered.some(reg => {
       if (reg.matcher(exec)) {
-        customExecResult = reg.handler(exec, path, onError, isInError, handlerContext);
+        customExecResult = reg.handler(exec, onError, isInError, handlerExits);
         return true;
       }
       return false;
@@ -202,77 +93,18 @@ export function createExecution<
       return customExecResult;
     }
 
-    // Null
-    if (exec === null) {
-      console.log('null');
-      const next = () => basicHandlerOutputs.null(handlerContext);
-      return basicHandlerHooks.null ? basicHandlerHooks.null(next, path, onError, isInError, handlerContext) : next();
-    }
-
-    // Promise
-    if (isPromise(exec)) {
-      console.log('promise');
-      const next = (transformed: Promise<any>) =>
-        basicHandlerOutputs.promise(
-          transformed
-            .then(subResult => resolveAsync(subResult, [...path, 'resolved'], onError, isInError))
-            .catch(error => {
-              rejectAsync(onError, error, [...path, 'rejected'], isInError);
-            }),
-          handlerContext
-        );
-      return basicHandlerHooks.promise
-        ? basicHandlerHooks.promise(exec, next, path, onError, isInError, handlerContext)
-        : next(exec);
-    }
-
-    // Array
-    if (Array.isArray(exec)) {
-      const next = (transformed: Array<any>) =>
-        basicHandlerOutputs.array(
-          transformed.map((item, index) => {
-            return resolve(item, appToPath(path, index), onError, isInError);
-          }),
-          handlerContext
-        );
-      return basicHandlerHooks.array
-        ? basicHandlerHooks.array(exec, next, path, onError, isInError, handlerContext)
-        : next(exec);
-    }
-
-    // Object
-    if (isPlainObject(exec)) {
-      console.log('plain object');
-      const next = (transformed: { [key: string]: any }) =>
-        basicHandlerOutputs.object(
-          Object.keys(transformed).reduce(
-            (acc, key) => {
-              acc[key] = resolve(transformed[key], appToPath(path, key), onError, isInError);
-              return acc;
-            },
-            {} as any
-          ),
-          handlerContext
-        );
-      return basicHandlerHooks.object
-        ? basicHandlerHooks.object(exec, next, path, onError, isInError, handlerContext)
-        : next(exec);
-    }
-
     // Unknown
     console.log('unknown');
     console.log(exec);
-    const next = (transformed: any) => basicHandlerOutputs.unknown(exec, handlerContext);
-    return basicHandlerHooks.unknown
-      ? basicHandlerHooks.unknown(exec, next, path, onError, isInError, handlerContext)
-      : next(exec);
+    const next = (transformed: any) => unknownHandlerOutput(exec, handlerExits);
+    return unknownHandlerHook ? unknownHandlerHook(exec, next, onError, isInError, handlerExits) : next(exec);
   }
 
-  function run(action: Executable): void {
-    resolveAsync(action, [], defaultOnError, false);
+  function run(action: ExecutableType): void {
+    resolveAsync(action, defaultOnError, false);
   }
 
-  function register<Exec>(reg: Registered<Exec, OnErroParams, HandlerOutput, HandlerContext>): () => void {
+  function register<Exec>(reg: Registered<ExecutableType, Exec, OnErroParams, HandlerOutput>): () => void {
     registered = [...registered, reg];
     const unregisterExecution = () => {
       const index = registered.indexOf(reg);
