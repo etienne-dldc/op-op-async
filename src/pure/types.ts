@@ -1,30 +1,32 @@
-import { IS_EXECUTABLE } from './consts';
+export const yolo4 = true;
 
-type NeedFlush = boolean;
+// import { IS_EXECUTABLE } from './consts';
 
-type TheState<Config extends BaseConfig> = Config['state'] extends undefined ? {} : Config['state'];
+// type NeedFlush = boolean;
 
-type ExecutableParam<State> =
-  | null
-  | NamedExecutable<State>
-  | ObjectOfExecutable<State>
-  | ArrayOfExecutable<State>
-  | Promise<ExecutableNoCircular<State>>
-  | RunAction<State, any>
-  | ErrorHandler<State>;
+// type TheState<Config extends BaseConfig> = Config['state'] extends undefined ? {} : Config['state'];
 
-/**
- * CONTEXT
- */
+// type ExecutableParam<State> =
+//   | null
+//   | NamedExecutable<State>
+//   | ObjectOfExecutable<State>
+//   | ArrayOfExecutable<State>
+//   | Promise<ExecutableNoCircular<State>>
+//   | RunAction<State, any>
+//   | ErrorHandler<State>;
 
-export type BaseContext<State> = {
-  state: State;
-};
+// /**
+//  * CONTEXT
+//  */
 
-export type ValueContext<State, Value> = BaseContext<State> & {
-  value: Value;
-};
+// export type BaseContext<State> = {
+//   state: State;
+// };
 
-export type ErrorContext<State> = BaseContext<State> & {
-  error: any;
-};
+// export type ValueContext<State, Value> = BaseContext<State> & {
+//   value: Value;
+// };
+
+// export type ErrorContext<State> = BaseContext<State> & {
+//   error: any;
+// };

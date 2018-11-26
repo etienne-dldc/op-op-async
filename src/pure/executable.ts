@@ -1,145 +1,123 @@
-import { Registered, HandlerExits, ErrorFunction } from './Execution';
-import { isPromise, isPlainObject } from './utils';
+export const yolo = true;
 
-export const IS_EXECUTABLE = Symbol('IS_EXECUTABLE');
+// import { Registered, HandlerExits, ErrorFunction } from './Execution';
+// import { isPromise, isPlainObject } from './utils';
 
-export type ExecutableAny = {
-  [IS_EXECUTABLE]: true;
-};
+// export const IS_EXECUTABLE = Symbol('IS_EXECUTABLE');
 
-type ExecutableNoCircular = null | ExecutableAny | ObjectOfExecutable;
+// export type ExecutableAny = {
+//   [IS_EXECUTABLE]: true;
+// };
 
-export type Executable = ExecutableNoCircular | ArrayOfExecutable | Promise<ExecutableNoCircular>;
+// type ExecutableNoCircular = null | ExecutableAny | ObjectOfExecutable;
 
-type ArrayOfExecutable = Array<ExecutableNoCircular | Promise<ExecutableNoCircular>>;
+// export type Executable = ExecutableNoCircular | ArrayOfExecutable | Promise<ExecutableNoCircular>;
 
-type ObjectOfExecutable = {
-  [key: string]: Executable;
-};
+// type ArrayOfExecutable = Array<ExecutableNoCircular | Promise<ExecutableNoCircular>>;
 
-type Path = Array<string | number>;
+// type ObjectOfExecutable = {
+//   [key: string]: Executable;
+// };
 
-export function supportNull<
-  ExecutableType,
-  OnErroParams,
-  HandlerOutput,
-  HandlerContext extends HandlerExits<ExecutableType, OnErroParams, HandlerOutput>
->(
-  output: (exec: null, context: HandlerContext) => HandlerOutput,
-  hook?: (
-    exec: null,
-    next: (transformed: any) => HandlerOutput,
-    onError: ErrorFunction<OnErroParams, ExecutableType>,
-    isInError: boolean,
-    context: HandlerContext
-  ) => HandlerOutput
-): Registered<ExecutableType, null, OnErroParams, HandlerOutput> {
-  return {
-    matcher: (exec): exec is null => exec === null,
-    handler: (exec, onError, isInError, ctx) => {
-      const next = () => output(null, ctx);
-      return hook ? hook(null, next, onError, isInError, ctx) : next();
-    },
-  };
-}
+// type Path = Array<string | number>;
 
-export function supportPomise<
-  ExecutableType,
-  OnErroParams,
-  HandlerOutput,
-  HandlerContext extends HandlerExits<ExecutableType, OnErroParams, HandlerOutput>
->(
-  output: (exec: Promise<any>, context: HandlerContext) => HandlerOutput,
-  hook?: (
-    exec: Promise<any>,
-    next: (transformed: any) => HandlerOutput,
-    onError: ErrorFunction<OnErroParams, ExecutableType>,
-    isInError: boolean,
-    context: HandlerContext
-  ) => HandlerOutput
-): Registered<ExecutableType, Promise<any>, OnErroParams, HandlerOutput, HandlerContext> {
-  return {
-    matcher: (exec): exec is Promise<any> => isPromise(exec),
-    handler: (exec, onError, isInError, ctx) => {
-      const next = (transformed: Promise<any>) =>
-        output(
-          transformed
-            .then(subResult => ctx.resolveAsync(subResult, onError, isInError))
-            .catch(error => {
-              ctx.rejectAsync(onError, error, isInError);
-            }),
-          ctx
-        );
-      return hook ? hook(exec, next, onError, isInError, ctx) : next(exec);
-    },
-  };
-}
+// export function supportNull<ExecutableType, OnErroParams, HandlerOutput>(
+//   output: (exec: null, exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>) => HandlerOutput,
+//   hook?: (
+//     exec: null,
+//     next: (transformed: any) => HandlerOutput,
+//     onError: ErrorFunction<OnErroParams, ExecutableType>,
+//     exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>
+//   ) => HandlerOutput
+// ): Registered<ExecutableType, null, OnErroParams, HandlerOutput> {
+//   return {
+//     matcher: (exec): exec is null => exec === null,
+//     handler: (exec, onError, exits) => {
+//       const next = () => output(null, exits);
+//       return hook ? hook(null, next, onError, exits) : next();
+//     },
+//   };
+// }
 
-export function supportArray<
-  ExecutableType,
-  OnErroParams,
-  HandlerOutput,
-  HandlerContext extends HandlerExits<ExecutableType, OnErroParams, HandlerOutput>
->(
-  output: (exec: Array<any>, context: HandlerContext) => HandlerOutput,
-  hook?: (
-    exec: Array<any>,
-    next: (transformed: any) => HandlerOutput,
-    onError: ErrorFunction<OnErroParams, ExecutableType>,
-    isInError: boolean,
-    context: HandlerContext
-  ) => HandlerOutput
-): Registered<ExecutableType, Array<any>, OnErroParams, HandlerOutput, HandlerContext> {
-  return {
-    matcher: (exec): exec is Array<any> => Array.isArray(exec),
-    handler: (exec, onError, isInError, ctx) => {
-      const next = (transformed: Array<any>) =>
-        output(
-          transformed.map(item => {
-            return ctx.resolve(item, onError, isInError);
-          }),
-          ctx
-        );
-      return hook ? hook(exec, next, onError, isInError, ctx) : next(exec);
-    },
-  };
-}
+// export function supportPomise<ExecutableType, OnErroParams, HandlerOutput>(
+//   output: (exec: Promise<any>, exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>) => HandlerOutput,
+//   hook?: (
+//     exec: Promise<any>,
+//     next: (transformed: any) => HandlerOutput,
+//     onError: ErrorFunction<OnErroParams, ExecutableType>,
+//     exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>
+//   ) => HandlerOutput
+// ): Registered<ExecutableType, Promise<any>, OnErroParams, HandlerOutput> {
+//   return {
+//     matcher: (exec): exec is Promise<any> => isPromise(exec),
+//     handler: (exec, onError, exits) => {
+//       const next = (transformed: Promise<any>) =>
+//         output(
+//           transformed
+//             .then(subResult => exits.resolveAsync(subResult, onError))
+//             .catch(error => {
+//               exits.rejectAsync(onError, error);
+//             }),
+//           exits
+//         );
+//       return hook ? hook(exec, next, onError, exits) : next(exec);
+//     },
+//   };
+// }
 
-type PlainObject = { [key: string]: any };
-export function supportObject<
-  ExecutableType,
-  OnErroParams,
-  HandlerOutput,
-  HandlerContext extends HandlerExits<ExecutableType, OnErroParams, HandlerOutput>
->(
-  output: (exec: PlainObject, context: HandlerContext) => HandlerOutput,
-  hook?: (
-    exec: PlainObject,
-    next: (transformed: any) => HandlerOutput,
-    onError: ErrorFunction<OnErroParams, ExecutableType>,
-    isInError: boolean,
-    context: HandlerContext
-  ) => HandlerOutput
-): Registered<ExecutableType, PlainObject, OnErroParams, HandlerOutput, HandlerContext> {
-  return {
-    matcher: (exec): exec is PlainObject => isPlainObject(exec),
-    handler: (exec, onError, isInError, ctx) => {
-      const next = (transformed: PlainObject) =>
-        output(
-          Object.keys(transformed).reduce(
-            (acc, key) => {
-              acc[key] = ctx.resolve(transformed[key], onError, isInError);
-              return acc;
-            },
-            {} as any
-          ),
-          ctx
-        );
-      return hook ? hook(exec, next, onError, isInError, ctx) : next(exec);
-    },
-  };
-}
+// export function supportArray<ExecutableType, OnErroParams, HandlerOutput>(
+//   output: (exec: Array<any>, exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>) => HandlerOutput,
+//   hook?: (
+//     exec: Array<any>,
+//     next: (transformed: any) => HandlerOutput,
+//     onError: ErrorFunction<OnErroParams, ExecutableType>,
+//     exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>
+//   ) => HandlerOutput
+// ): Registered<ExecutableType, Array<any>, OnErroParams, HandlerOutput> {
+//   return {
+//     matcher: (exec): exec is Array<any> => Array.isArray(exec),
+//     handler: (exec, onError, exits) => {
+//       const next = (transformed: Array<any>) =>
+//         output(
+//           transformed.map(item => {
+//             return exits.resolve(item, onError);
+//           }),
+//           exits
+//         );
+//       return hook ? hook(exec, next, onError, exits) : next(exec);
+//     },
+//   };
+// }
 
-export function asExecutable(exec: any): ExecutableAny {
-  return exec as any;
-}
+// type PlainObject = { [key: string]: any };
+// export function supportObject<ExecutableType, OnErroParams, HandlerOutput>(
+//   output: (exec: PlainObject, exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>) => HandlerOutput,
+//   hook?: (
+//     exec: PlainObject,
+//     next: (transformed: any) => HandlerOutput,
+//     onError: ErrorFunction<OnErroParams, ExecutableType>,
+//     exits: HandlerExits<ExecutableType, OnErroParams, HandlerOutput>
+//   ) => HandlerOutput
+// ): Registered<ExecutableType, PlainObject, OnErroParams, HandlerOutput> {
+//   return {
+//     matcher: (exec): exec is PlainObject => isPlainObject(exec),
+//     handler: (exec, onError, exits) => {
+//       const next = (transformed: PlainObject) =>
+//         output(
+//           Object.keys(transformed).reduce(
+//             (acc, key) => {
+//               acc[key] = exits.resolve(transformed[key], onError);
+//               return acc;
+//             },
+//             {} as any
+//           ),
+//           exits
+//         );
+//       return hook ? hook(exec, next, onError, exits) : next(exec);
+//     },
+//   };
+// }
+
+// export function asExecutable(exec: any): ExecutableAny {
+//   return exec as any;
+// }
