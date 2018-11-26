@@ -32,17 +32,27 @@ type BasicHandlerContext<OnErroParams, Output> = {
   rejectAsync(onError: ErrorFunction<OnErroParams>, error: any, path: Path, isInError: boolean): void;
 };
 type ExecutionMatcher<Exec> = (exec: any) => exec is Exec;
-type ExecutionHandler<OnErroParams, Output, Exec> = (
+type ExecutionHandler<
+  Exec,
+  OnErroParams,
+  HandlerOutput,
+  HandlerContext extends BasicHandlerContext<OnErroParams, HandlerOutput>
+> = (
   exec: Exec,
   path: Path,
   onError: ErrorFunction<OnErroParams>,
   isInError: boolean,
-  ctx: BasicHandlerContext<OnErroParams, Output>
-) => Output;
+  ctx: HandlerContext
+) => HandlerOutput;
 
-type Registered<OnErroParams, Output, Exec> = {
+type Registered<
+  Exec,
+  OnErroParams,
+  HandlerOutput,
+  HandlerContext extends BasicHandlerContext<OnErroParams, HandlerOutput>
+> = {
   matcher: ExecutionMatcher<Exec>;
-  handler: ExecutionHandler<OnErroParams, Output, Exec>;
+  handler: ExecutionHandler<Exec, OnErroParams, HandlerOutput, HandlerContext>;
 };
 
 /**
@@ -133,7 +143,7 @@ export function createExecution<
   >
 >(
   options: ExecutionOptions<OnErroParams, HandlerOutput, HandlerContext>,
-  initialRegistered: Array<Registered<OnErroParams, HandlerOutput, any>> = []
+  initialRegistered: Array<Registered<any, OnErroParams, HandlerOutput, HandlerContext>> = []
 ) {
   const {
     onError: defaultOnError,
@@ -144,7 +154,7 @@ export function createExecution<
     basicHandlerOutputs,
   } = options;
 
-  let registered: Array<Registered<OnErroParams, HandlerOutput, any>> = [...initialRegistered];
+  let registered: Array<Registered<any, OnErroParams, HandlerOutput, HandlerContext>> = [...initialRegistered];
   let handlerContext: HandlerContext = createHandlerContext({
     resolve,
     resolveAsync,
@@ -262,7 +272,7 @@ export function createExecution<
     resolveAsync(action, [], defaultOnError, false);
   }
 
-  function register<Exec>(reg: Registered<OnErroParams, HandlerOutput, Exec>): () => void {
+  function register<Exec>(reg: Registered<Exec, OnErroParams, HandlerOutput, HandlerContext>): () => void {
     registered = [...registered, reg];
     const unregisterExecution = () => {
       const index = registered.indexOf(reg);

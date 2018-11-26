@@ -26,9 +26,35 @@ const execution = createExecution<{ error: any }, null>({
   },
 });
 
+try {
+  execution.run([
+    asExecutable([]),
+    asExecutable('hello'),
+    asExecutable(() => {}),
+    {
+      demo: {
+        yolo: [],
+      },
+    },
+  ]);
+} catch (error) {
+  console.log(error);
+}
+
+console.log('=====');
+
+execution.register<string>({
+  matcher: (val): val is string => typeof val === 'string',
+  handler: (val, path, onError, isInError, ctx) => {
+    console.log('string', val);
+    return null;
+  },
+});
+
 execution.run([
   asExecutable([]),
   asExecutable('hello'),
+  asExecutable(() => {}),
   {
     demo: {
       yolo: [],
