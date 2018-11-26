@@ -26,6 +26,14 @@ const myOtherAction = makeExecutable(
   'myOtherAction'
 );
 
+const myThridAction = makeExecutable(
+  pipe(
+    addTwo,
+    universe
+  ),
+  'myOtherAction'
+);
+
 Promise.resolve(myDemoAction(1)).then(console.log);
 Promise.resolve(myDemoAction(2)).then(console.log);
 Promise.resolve(myOtherAction(3)).then(console.log);
@@ -33,3 +41,4 @@ Promise.resolve(myDemoAction(4)).then(console.log);
 Promise.resolve(myDemoAction(6)).then(console.log);
 Promise.resolve(myOtherAction(2)).then(console.log);
 Promise.resolve(myOtherAction(6)).then(console.log);
+Promise.resolve(myThridAction(6)).then(console.log);

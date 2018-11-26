@@ -3,6 +3,7 @@ import { injectGlobal } from 'emotion';
 import { render } from 'react-dom';
 import React from 'react';
 import { TreeApp } from './opp-view';
+import './pure';
 
 // import './opp';
 
@@ -12,4 +13,4 @@ html, body {
 }
 `;
 
-render(<TreeApp />, document.getElementById('root'));
+// render(<TreeApp />, document.getElementById('root'));
