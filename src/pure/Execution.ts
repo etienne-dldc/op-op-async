@@ -1,10 +1,11 @@
-import { isPromise } from './utils';
+import { isPromise, isPlainObject } from './utils';
 
 type Exit<Context> = (executable: any, context: Context) => Context;
 
 export type Exits<Context> = {
   handle: Exit<Context>;
   handleAsync: Exit<Context>;
+  ignore: Exit<Context>;
 };
 
 export type OppError = any;
@@ -41,47 +42,62 @@ function createNextContext(ctx: Context, part: string | number | null = null, on
   };
 }
 
-const handleNull = createHandler<Context>((executable, ctx, { handle }) => {
+const handleNull = createHandler<Context>((executable, ctx, { handle, ignore }) => {
   if (executable === null) {
     return createNextContext(ctx, 'null');
   }
-  return handle(executable, ctx);
+  return ignore(executable, ctx);
 });
 
-type Attemps = {
-  displayName: string;
-  attempt: Executable;
-  onError: Executable;
-};
+// type Attemps = {
+//   displayName: string;
+//   attempt: Executable;
+//   onError: Executable;
+// };
 
-function isAttempt(executable: any): executable is Attemps {
-  return true;
-}
+// function isAttempt(executable: any): executable is Attemps {
+//   return true;
+// }
 
-const handleAttempt = createHandler<Context>((executable, ctx, { handle }) => {
-  if (isAttempt(executable)) {
-    const result = handle(executable.attempt, createNextContext(ctx, 'attempt', executable.onError));
-    return result;
-  }
-  return handle(executable, ctx);
-});
+// const handleAttempt = createHandler<Context>((executable, ctx, { handle, ignore }) => {
+//   if (isAttempt(executable)) {
+//     const result = handle(executable.attempt, createNextContext(ctx, 'attempt', executable.onError));
+//     return result;
+//   }
+//   return ignore(executable, ctx);
+// });
 
-const handlePromise = createHandler<Context>((executable, ctx, { handle, handleAsync }) => {
+const handlePromise = createHandler<Context>((executable, ctx, { handle, handleAsync, ignore }) => {
   if (isPromise(executable)) {
     const promiseCtx = createNextContext(ctx, 'promise');
     executable.then(val => handleAsync(val, createNextContext(promiseCtx, 'resolved'))).catch(err => {});
     return promiseCtx;
   }
-  return handle(executable, ctx);
+  return ignore(executable, ctx);
 });
 
-const handleArray = createHandler<Context>((executable, ctx, { handle }) => {
+const handleArray = createHandler<Context>((executable, ctx, { handle, ignore }) => {
   if (Array.isArray(executable)) {
     const arrContext = createNextContext(ctx, 'array');
     const contexts = executable.map((exec, index) => handle(exec, createNextContext(arrContext, index)));
     return arrContext;
   }
-  return handle(executable, ctx);
+  return ignore(executable, ctx);
+});
+
+const handleObject = createHandler<Context>((executable, ctx, { handle, ignore }) => {
+  if (isPlainObject(executable)) {
+    const objContext = createNextContext(ctx, 'object');
+    const contexts: { [key: string]: Context } = Object.keys(executable).reduce(
+      (acc, key) => {
+        acc[key] = handle(executable[key], createNextContext(objContext, key));
+        return acc;
+      },
+      {} as any
+    );
+    return objContext;
+  }
+  return ignore(executable, ctx);
 });
 
 function pipe<Context>(...handlers: Array<Handler<Context>>): Handler<Context> {
@@ -90,17 +106,13 @@ function pipe<Context>(...handlers: Array<Handler<Context>>): Handler<Context> {
     const createExits = (nextOperatorIndex: number, exits: Exits<any>, ctx: Context): Exits<Context> => {
       const nextHandler = handlers[nextOperatorIndex];
       return {
-        handle: (nextExec, nextCtx) => {
+        handle: exits.handle,
+        handleAsync: exits.handleAsync,
+        ignore: (nextExec, nextCtx) => {
           if (nextHandler) {
             return nextHandler(nextExec, nextCtx, createExits(nextOperatorIndex + 1, exits, nextCtx));
           }
-          return exits.handle(nextExec, nextCtx);
-        },
-        handleAsync: (nextExec, nextCtx) => {
-          if (nextHandler) {
-            return nextHandler(nextExec, nextCtx, createExits(nextOperatorIndex + 1, exits, nextCtx));
-          }
-          return exits.handleAsync(nextExec, nextCtx);
+          return exits.ignore(nextExec, nextCtx);
         },
       };
     };
@@ -111,7 +123,8 @@ function pipe<Context>(...handlers: Array<Handler<Context>>): Handler<Context> {
 const handleAll = pipe(
   handleArray,
   handleNull,
-  handlePromise
+  handlePromise,
+  handleObject
 );
 
 function run<Context>(handler: Handler<Context>, executable: Executable, inititlaContext: Context): Context {
@@ -123,6 +136,9 @@ function run<Context>(handler: Handler<Context>, executable: Executable, inititl
         console.log('async: ', asyncResult);
         return asyncResult;
       },
+      ignore: (exec, ctx) => {
+        throw new Error('Unsuported');
+      },
     });
   };
   const result = handle(executable, inititlaContext);
@@ -130,7 +146,10 @@ function run<Context>(handler: Handler<Context>, executable: Executable, inititl
   return result;
 }
 
-const result = run(handleAll, [Promise.resolve(null)], { path: [], onError: null });
+const result = run(handleAll, [Promise.resolve([Promise.resolve(null)]), null, { a: null, b: null }], {
+  path: [],
+  onError: null,
+});
 
 // handleAll([Promise.resolve(null)], { path: [], onError: null }, {
 //   handle: (executable, ctx) => {
