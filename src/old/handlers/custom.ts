@@ -7,25 +7,25 @@ import {
   ErrorHandler,
   Context,
   handleError,
-} from '../overmind';
-import { isPlainObject } from '../utils';
+} from '../base';
+import { isPlainObject } from '../../utils';
 
 const IS_ATTEMPT = Symbol('IS_ATTEMPT');
 
-type Attempt = {
+type Attempt<Input, Output> = {
   [IS_ATTEMPT]: {
     displayName: string;
-    attempt: Executable;
+    attempt: Executable<Input, Output>;
     onError: ErrorHandler;
   };
 };
 
-function isAttempt(executable: any): executable is Attempt {
+function isAttempt(executable: any): executable is Attempt<any, any> {
   return isPlainObject(executable) && executable[IS_ATTEMPT];
 }
 
-export function attempt(name: string, attempt: Executable, onError: ErrorHandler) {
-  return asExecutable<Attempt>({
+export function attempt<Input, Output>(name: string, attempt: Executable<any, any>, onError: ErrorHandler) {
+  return asExecutable<Input, Output, Attempt<Input, Output>>({
     [IS_ATTEMPT]: {
       displayName: name,
       attempt,
@@ -38,7 +38,7 @@ export const handleAttempt = createHandler((executable, ctx, { handle, ignore })
   if (isAttempt(executable)) {
     const result = handle(
       executable[IS_ATTEMPT].attempt,
-      createNextContext(ctx, 'attempt', executable[IS_ATTEMPT].onError)
+      createNextContext(ctx, ctx.value, 'attempt', executable[IS_ATTEMPT].onError)
     );
     return result;
   }
@@ -51,18 +51,22 @@ export const handleAttempt = createHandler((executable, ctx, { handle, ignore })
 
 const IS_RUN_ACTION = Symbol('IS_RUN_ACTION');
 
-type ActionFunction<Value> = (value: Value, ctx: Context) => Executable;
+type ActionFunction<Input, Output> = (value: Input, ctx: Context<Input>) => Executable<Input, Output>;
 
-type RunAction<Value> = {
+type RunAction<Input, Output> = {
   [IS_RUN_ACTION]: {
-    action: ActionFunction<Value>;
+    action: ActionFunction<Input, Output>;
     displayName: string;
-    value: Value;
+    value: Input;
   };
 };
 
-export function runAction<Value>(name: string, action: ActionFunction<Value>, value: Value): ExecutableAny {
-  return asExecutable<RunAction<Value>>({
+export function runAction<Input, Output>(
+  name: string,
+  action: ActionFunction<Input, Output>,
+  value: Input
+): ExecutableAny<Input, Output> {
+  return asExecutable<Input, Output, RunAction<Input, Output>>({
     [IS_RUN_ACTION]: {
       action,
       displayName: name,
@@ -71,13 +75,13 @@ export function runAction<Value>(name: string, action: ActionFunction<Value>, va
   });
 }
 
-function isRunAction(executable: any): executable is RunAction<any> {
+function isRunAction(executable: any): executable is RunAction<any, any> {
   return isPlainObject(executable) && executable[IS_RUN_ACTION];
 }
 
 export const handleRunAction = createHandler((executable, ctx, { ignore, handle }) => {
   if (isRunAction(executable)) {
-    const actionCtx = createNextContext(ctx, executable[IS_RUN_ACTION].displayName);
+    const actionCtx = createNextContext(ctx, ctx.value, executable[IS_RUN_ACTION].displayName);
     let nextExec: Executable;
     try {
       nextExec = executable[IS_RUN_ACTION].action(executable[IS_RUN_ACTION].value, actionCtx);

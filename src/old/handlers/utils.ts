@@ -1,9 +1,9 @@
-import { createHandler, Context, Handler, Exits } from '../overmind';
+import { createHandler, Context, Handler, Exits } from '../base';
 
-export function pipe(...handlers: Array<Handler>): Handler {
+export function pipe(...handlers: Array<Handler<any>>): Handler<any> {
   return createHandler((executable, context, exits) => {
     let ctx = context;
-    const createExits = (nextOperatorIndex: number, exits: Exits, ctx: Context): Exits => {
+    const createExits = (nextOperatorIndex: number, exits: Exits<any>, ctx: Context<any>): Exits<any> => {
       const nextHandler = handlers[nextOperatorIndex];
       return {
         handle: exits.handle,
