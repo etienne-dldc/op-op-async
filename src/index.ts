@@ -1,21 +1,38 @@
-import { pipe, map, value, action, mutation } from './factories';
+import { pipe, map, value, action, mutation, parallel } from './factories';
 import { run } from './lib';
-
-const logNumber = action<number, number>(ctx => {
-  console.log(ctx.value);
-  return value(ctx.value);
-});
+import { Callable } from './types';
 
 const setBar = mutation<number>(({ state, value }) => {
   state.bar = value;
 });
 
+const logNumber = action<number, number>(ctx => {
+  console.log(ctx.value);
+  return pipe(
+    value(ctx.value),
+    setBar
+  );
+});
+
+const single = pipe(value(42));
+
+single();
+
+const double = map<number, number>(({ value }) => value * 2);
+
+const eight = double(4);
+
+const singleMap = pipe(map<number, number>(({ value }) => value * 2));
+
+singleMap(34);
+
 const doStuff = pipe(
-  // value(42),
+  eight,
+  value(42),
   map<number, Promise<string>>(({ value }) => Promise.resolve(`${value + 4}`)),
   value(43),
   setBar,
-  action(ctx => {
+  action(() => {
     return value({ stuff: true });
   }),
   map(({ value }) => {
@@ -23,8 +40,21 @@ const doStuff = pipe(
   }),
   value(43),
   logNumber,
-  map(ctx => ctx.value),
-  map(ctx => ctx.value)
+  pipe(
+    map(ctx => ctx.value),
+    map(ctx => ctx.value),
+    map(ctx => ctx.value),
+    map(ctx => ctx.value),
+    map(ctx => ctx.value)
+  )
 );
 
-run(doStuff(42));
+run(doStuff);
+
+const para = parallel(
+  value('hello'),
+  map<{ num: number }, Promise<number>>(({ value }) => Promise.resolve(value.num * 2)),
+  map<{ str: string }, number>(({ value }) => parseInt(value.str, 10))
+);
+
+para({ num: 34, str: '10' });
