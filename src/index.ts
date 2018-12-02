@@ -1,5 +1,5 @@
-import { pipe, map, value, action, mutation, parallel } from './factories';
-import { run } from './lib';
+import { pipe, map, value, action, mutation, parallel, run } from './factories';
+import { execute } from './lib';
 import { Callable } from './types';
 
 const setBar = mutation<number>(({ state, value }) => {
@@ -49,7 +49,7 @@ const doStuff = pipe(
   )
 );
 
-run(doStuff);
+execute(doStuff);
 
 const para = parallel(
   value('hello'),
@@ -58,3 +58,17 @@ const para = parallel(
 );
 
 para({ num: 34, str: '10' });
+
+const logParaResult = pipe(
+  para,
+  run(({ value }) => {
+    const str = value[0];
+    const num = value[1];
+    const otherNum = value[2];
+    // value[3] // => error Index '3' is out-of-bounds in tuple of length 3
+    console.log(value);
+  })
+);
+
+// execute(logParaResult) // Error invalid input
+execute(logParaResult({ str: '10', num: 34 }));

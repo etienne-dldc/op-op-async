@@ -18,6 +18,10 @@ export function action<Input, Output>(
   return {} as any;
 }
 
+export function run<Input>(act: (ctx: Context<Input>) => void): Callable<Input, Input> {
+  return {} as any;
+}
+
 export function mutation<Input>(act: (ctx: Context<Input>) => void): Callable<Input, Input> {
   return {} as any;
 }
