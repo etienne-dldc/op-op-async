@@ -1,6 +1,7 @@
+import React from 'react';
 import { pipe, map, value, action, mutation, parallel, run } from './factories';
 import { execute } from './lib';
-import { Callable } from './types';
+import { useStore, derived } from './connect';
 
 const setBar = mutation<number>(({ state, value }) => {
   state.bar = value;
@@ -72,3 +73,13 @@ const logParaResult = pipe(
 
 // execute(logParaResult) // Error invalid input
 execute(logParaResult({ str: '10', num: 34 }));
+
+type Props = {
+  hello: string;
+};
+
+const MyComponent: React.FunctionComponent<Props> = ({ hello }) => {
+  const { bar } = useStore(derived(s => s, state => ({ bar: state.bar })));
+
+  return <div>Hello: {hello}</div>;
+};

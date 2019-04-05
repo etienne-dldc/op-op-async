@@ -39,10 +39,12 @@ export function extractExecutableMetadata(executable: ExecutableAny<any, any, an
   return executable[IS_EXECUTABLE];
 }
 
+export type State = {
+  foo: string;
+  bar: number;
+};
+
 export type Context<Value> = {
   value: Value;
-  state: {
-    foo: string;
-    bar: number;
-  };
+  state: State;
 };
